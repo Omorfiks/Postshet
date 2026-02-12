@@ -1,7 +1,6 @@
 from flask import Flask, render_template, jsonify, request, send_from_directory, session, redirect, url_for
 from flask_cors import CORS
 from dotenv import load_dotenv
-import sqlite3
 import os
 import hashlib
 import hmac
@@ -12,6 +11,10 @@ import traceback
 from urllib.request import urlopen, Request
 from urllib.error import HTTPError, URLError
 
+# PostgreSQL
+import psycopg2
+import psycopg2.extras
+
 load_dotenv()
 
 app = Flask(__name__)
@@ -20,7 +23,10 @@ CORS(app)
 # Конфигурация
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads')
-DB_PATH = 'database/memes.db'
+
+# Строка подключения к PostgreSQL (например, от Render)
+DATABASE_URL = os.environ.get('DATABASE_URL')
+
 app.secret_key = os.environ.get('SECRET_KEY', 'dev-secret-change-in-production')
 TELEGRAM_BOT_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN', '')
 TELEGRAM_BOT_USERNAME = os.environ.get('TELEGRAM_BOT_USERNAME', '').strip().lstrip('@')
@@ -44,7 +50,16 @@ if SITE_BASE_URL.lower().startswith('https'):
     app.config['SESSION_COOKIE_SECURE'] = True
 
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-os.makedirs('database', exist_ok=True)
+
+
+def get_db():
+    """
+    Открыть соединение с PostgreSQL.
+    Использует DATABASE_URL из окружения.
+    """
+    if not DATABASE_URL:
+        raise RuntimeError("DATABASE_URL не задан в окружении")
+    return psycopg2.connect(DATABASE_URL)
 
 
 def verify_telegram_login_hash(data, bot_token):
@@ -95,59 +110,89 @@ def fetch_telegram_user_photo(telegram_id):
         return None
 
 
-# Инициализация БД
+# Инициализация БД (PostgreSQL)
 def init_db():
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db()
     c = conn.cursor()
-    
+
     # Таблица постов
-    c.execute('''CREATE TABLE IF NOT EXISTS posts
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
-                  telegram_id INTEGER UNIQUE,
-                  media_type TEXT,
-                  media_path TEXT,
-                  caption TEXT,
-                  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
-    
+    c.execute(
+        """
+        CREATE TABLE IF NOT EXISTS posts (
+            id SERIAL PRIMARY KEY,
+            telegram_id BIGINT UNIQUE,
+            media_type TEXT,
+            media_path TEXT,
+            caption TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+
     # Таблица реакций (агрегат счётчиков по типу на пост)
-    c.execute('''CREATE TABLE IF NOT EXISTS reactions
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
-                  post_id INTEGER,
-                  reaction_type TEXT,
-                  count INTEGER DEFAULT 1,
-                  FOREIGN KEY (post_id) REFERENCES posts(id))''')
-    
+    c.execute(
+        """
+        CREATE TABLE IF NOT EXISTS reactions (
+            id SERIAL PRIMARY KEY,
+            post_id INTEGER,
+            reaction_type TEXT,
+            count INTEGER DEFAULT 1,
+            FOREIGN KEY (post_id) REFERENCES posts(id)
+        )
+        """
+    )
+
     # Реакции пользователей: одна запись на (пост, пользователь)
-    c.execute('''CREATE TABLE IF NOT EXISTS user_reactions
-                 (post_id INTEGER NOT NULL,
-                  user_id TEXT NOT NULL,
-                  reaction_type TEXT NOT NULL,
-                  PRIMARY KEY (post_id, user_id),
-                  FOREIGN KEY (post_id) REFERENCES posts(id))''')
-    
+    c.execute(
+        """
+        CREATE TABLE IF NOT EXISTS user_reactions (
+            post_id INTEGER NOT NULL,
+            user_id TEXT NOT NULL,
+            reaction_type TEXT NOT NULL,
+            PRIMARY KEY (post_id, user_id),
+            FOREIGN KEY (post_id) REFERENCES posts(id)
+        )
+        """
+    )
+
     # Таблица информации о канале
-    c.execute('''CREATE TABLE IF NOT EXISTS channel_info
-                 (id INTEGER PRIMARY KEY,
-                  name TEXT,
-                  avatar_url TEXT,
-                  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
-    
+    c.execute(
+        """
+        CREATE TABLE IF NOT EXISTS channel_info (
+            id INTEGER PRIMARY KEY,
+            name TEXT,
+            avatar_url TEXT,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+
     # Таблица пользователей (привязка Telegram)
-    c.execute('''CREATE TABLE IF NOT EXISTS users
-                 (id INTEGER PRIMARY KEY AUTOINCREMENT,
-                  telegram_id INTEGER UNIQUE NOT NULL,
-                  username TEXT,
-                  first_name TEXT,
-                  last_name TEXT,
-                  photo_url TEXT,
-                  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
-    
+    c.execute(
+        """
+        CREATE TABLE IF NOT EXISTS users (
+            id SERIAL PRIMARY KEY,
+            telegram_id BIGINT UNIQUE NOT NULL,
+            username TEXT,
+            first_name TEXT,
+            last_name TEXT,
+            photo_url TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+
     # Одноразовые токены для входа через бота (мобильный flow)
-    c.execute('''CREATE TABLE IF NOT EXISTS login_tokens
-                 (token TEXT PRIMARY KEY,
-                  telegram_id INTEGER NOT NULL,
-                  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)''')
-    
+    c.execute(
+        """
+        CREATE TABLE IF NOT EXISTS login_tokens (
+            token TEXT PRIMARY KEY,
+            telegram_id BIGINT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+        """
+    )
+
     conn.commit()
     conn.close()
 
@@ -189,14 +234,20 @@ def auth_telegram_callback():
     photo_url = data_copy.get('photo_url') or ''
     user = {'telegram_id': int(telegram_id), 'username': username, 'first_name': first_name, 'last_name': last_name, 'photo_url': photo_url}
     user['is_admin'] = user['telegram_id'] in ADMIN_TELEGRAM_IDS
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db()
     c = conn.cursor()
-    c.execute('''INSERT INTO users (telegram_id, username, first_name, last_name, photo_url)
-                 VALUES (?, ?, ?, ?, ?)
-                 ON CONFLICT(telegram_id) DO UPDATE SET
-                 username=excluded.username, first_name=excluded.first_name,
-                 last_name=excluded.last_name, photo_url=excluded.photo_url''',
-              (telegram_id, username, first_name, last_name, photo_url))
+    c.execute(
+        """
+        INSERT INTO users (telegram_id, username, first_name, last_name, photo_url)
+        VALUES (%s, %s, %s, %s, %s)
+        ON CONFLICT (telegram_id) DO UPDATE SET
+            username = EXCLUDED.username,
+            first_name = EXCLUDED.first_name,
+            last_name = EXCLUDED.last_name,
+            photo_url = EXCLUDED.photo_url
+        """,
+        (telegram_id, username, first_name, last_name, photo_url),
+    )
     conn.commit()
     conn.close()
     session['user'] = user
@@ -213,9 +264,9 @@ def auth_telegram_verify():
     token = request.args.get('token')
     if not token:
         return redirect(url_for('index'))
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db()
     c = conn.cursor()
-    c.execute('SELECT telegram_id, created_at FROM login_tokens WHERE token = ?', (token,))
+    c.execute('SELECT telegram_id, created_at FROM login_tokens WHERE token = %s', (token,))
     row = c.fetchone()
     if not row:
         conn.close()
@@ -226,30 +277,37 @@ def auth_telegram_verify():
     except (TypeError, ValueError):
         created = datetime.utcnow() - timedelta(days=1)  # неверный формат — считаем просроченным
     if (datetime.utcnow() - created).total_seconds() > LOGIN_TOKEN_TTL_SECONDS:
-        c.execute('DELETE FROM login_tokens WHERE token = ?', (token,))
+        c.execute('DELETE FROM login_tokens WHERE token = %s', (token,))
         conn.commit()
         conn.close()
         return redirect(url_for('index'))
-    c.execute('DELETE FROM login_tokens WHERE token = ?', (token,))
-    c.execute('SELECT username, first_name, last_name, photo_url FROM users WHERE telegram_id = ?', (telegram_id,))
+    c.execute('DELETE FROM login_tokens WHERE token = %s', (token,))
+    c.execute('SELECT username, first_name, last_name, photo_url FROM users WHERE telegram_id = %s', (telegram_id,))
     user_row = c.fetchone()
     if user_row:
         username, first_name, last_name, photo_url = user_row
     else:
         username, first_name, last_name, photo_url = '', '', '', ''
-        c.execute('INSERT OR IGNORE INTO users (telegram_id, username, first_name, last_name, photo_url) VALUES (?, ?, ?, ?, ?)',
-                  (telegram_id, '', '', '', ''))
+        # В PostgreSQL аналог INSERT OR IGNORE — ON CONFLICT DO NOTHING
+        c.execute(
+            """
+            INSERT INTO users (telegram_id, username, first_name, last_name, photo_url)
+            VALUES (%s, %s, %s, %s, %s)
+            ON CONFLICT (telegram_id) DO NOTHING
+            """,
+            (telegram_id, '', '', '', ''),
+        )
     conn.commit()
     conn.close()
     photo_url = photo_url or ''
     if not photo_url:
         photo_url = fetch_telegram_user_photo(telegram_id) or ''
         if photo_url:
-            conn = sqlite3.connect(DB_PATH)
-            c = conn.cursor()
-            c.execute('UPDATE users SET photo_url = ? WHERE telegram_id = ?', (photo_url, telegram_id))
-            conn.commit()
-            conn.close()
+            conn2 = get_db()
+            c2 = conn2.cursor()
+            c2.execute('UPDATE users SET photo_url = %s WHERE telegram_id = %s', (photo_url, telegram_id))
+            conn2.commit()
+            conn2.close()
     user = {'telegram_id': int(telegram_id), 'username': username or '', 'first_name': first_name or '', 'last_name': last_name or '', 'photo_url': photo_url or ''}
     user['is_admin'] = user['telegram_id'] in ADMIN_TELEGRAM_IDS
     session['user'] = user
@@ -263,68 +321,82 @@ def uploaded_file(filename):
 
 @app.route('/api/posts')
 def get_posts():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    c = conn.cursor()
-    
-    c.execute('''SELECT p.*, 
-                        GROUP_CONCAT(r.reaction_type || ':' || r.count) as reactions
-                 FROM posts p
-                 LEFT JOIN reactions r ON p.id = r.post_id
-                 GROUP BY p.id
-                 ORDER BY p.created_at DESC''')
-    
+    conn = get_db()
+    c = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
+    c.execute(
+        """
+        SELECT p.*,
+               string_agg(r.reaction_type || ':' || r.count::text, ',') AS reactions
+        FROM posts p
+        LEFT JOIN reactions r ON p.id = r.post_id
+        GROUP BY p.id
+        ORDER BY p.created_at DESC
+        """
+    )
+
     posts = []
     for row in c.fetchall():
         post = dict(row)
         reactions = {}
-        if post['reactions']:
+        if post.get('reactions'):
             for reaction in post['reactions'].split(','):
                 r_type, count = reaction.split(':')
                 reactions[r_type] = int(count)
         post['reactions'] = reactions
         posts.append(post)
-    
+
     user_id = get_current_user_id()
     if user_id and posts:
         post_ids = [p['id'] for p in posts]
-        placeholders = ','.join('?' * len(post_ids))
         c.execute(
-            f'SELECT post_id, reaction_type FROM user_reactions WHERE user_id = ? AND post_id IN ({placeholders})',
-            [user_id] + post_ids
+            """
+            SELECT post_id, reaction_type
+            FROM user_reactions
+            WHERE user_id = %s AND post_id = ANY(%s)
+            """,
+            (user_id, post_ids),
         )
-        my_by_post = {row[0]: row[1] for row in c.fetchall()}
+        my_by_post = {row['post_id']: row['reaction_type'] for row in c.fetchall()}
         for post in posts:
             post['my_reaction'] = my_by_post.get(post['id'])
     else:
         for post in posts:
             post['my_reaction'] = None
-    
+
     conn.close()
     return jsonify(posts)
 
 @app.route('/api/posts', methods=['POST'])
 def create_post():
     data = request.json
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db()
     c = conn.cursor()
-    
-    c.execute('''INSERT OR IGNORE INTO posts (telegram_id, media_type, media_path, caption)
-                 VALUES (?, ?, ?, ?)''',
-              (data['telegram_id'], data['media_type'], data['media_path'], data.get('caption', '')))
-    
-    post_id = c.lastrowid
-    if post_id == 0:
-        c.execute('SELECT id FROM posts WHERE telegram_id = ?', (data['telegram_id'],))
+
+    c.execute(
+        """
+        INSERT INTO posts (telegram_id, media_type, media_path, caption)
+        VALUES (%s, %s, %s, %s)
+        ON CONFLICT (telegram_id) DO NOTHING
+        RETURNING id
+        """,
+        (data['telegram_id'], data['media_type'], data['media_path'], data.get('caption', '')),
+    )
+
+    row = c.fetchone()
+    if row:
+        post_id = row[0]
+    else:
+        c.execute('SELECT id FROM posts WHERE telegram_id = %s', (data['telegram_id'],))
         post_id = c.fetchone()[0]
-    
+
     conn.commit()
     conn.close()
     return jsonify({'id': post_id, 'status': 'success'})
 
 def _reactions_dict_for_post(c, post_id):
     """Собрать словарь {reaction_type: count} для поста из таблицы reactions."""
-    c.execute('SELECT reaction_type, count FROM reactions WHERE post_id = ?', (post_id,))
+    c.execute('SELECT reaction_type, count FROM reactions WHERE post_id = %s', (post_id,))
     return {row[0]: row[1] for row in c.fetchall()}
 
 
@@ -341,58 +413,68 @@ def add_reaction(post_id):
 
     conn = None
     try:
-        conn = sqlite3.connect(DB_PATH)
+        conn = get_db()
         c = conn.cursor()
 
-        c.execute('SELECT reaction_type FROM user_reactions WHERE post_id = ? AND user_id = ?', (post_id, user_id))
+        c.execute('SELECT reaction_type FROM user_reactions WHERE post_id = %s AND user_id = %s', (post_id, user_id))
         row = c.fetchone()
         current = row[0] if row else None
 
         if current == reaction_type:
             # Снять реакцию: та же эмоция — удаляем
-            c.execute('DELETE FROM user_reactions WHERE post_id = ? AND user_id = ?', (post_id, user_id))
-            c.execute('SELECT id, count FROM reactions WHERE post_id = ? AND reaction_type = ?', (post_id, reaction_type))
+            c.execute('DELETE FROM user_reactions WHERE post_id = %s AND user_id = %s', (post_id, user_id))
+            c.execute('SELECT id, count FROM reactions WHERE post_id = %s AND reaction_type = %s', (post_id, reaction_type))
             r = c.fetchone()
             if r:
                 rid, count = r
                 if count <= 1:
-                    c.execute('DELETE FROM reactions WHERE id = ?', (rid,))
+                    c.execute('DELETE FROM reactions WHERE id = %s', (rid,))
                 else:
-                    c.execute('UPDATE reactions SET count = count - 1 WHERE id = ?', (rid,))
+                    c.execute('UPDATE reactions SET count = count - 1 WHERE id = %s', (rid,))
             my_reaction = None
             is_new = False
         elif current is not None:
             # Сменить реакцию: другая эмоция — у старой -1, у новой +1
-            c.execute('UPDATE user_reactions SET reaction_type = ? WHERE post_id = ? AND user_id = ?',
-                      (reaction_type, post_id, user_id))
+            c.execute(
+                'UPDATE user_reactions SET reaction_type = %s WHERE post_id = %s AND user_id = %s',
+                (reaction_type, post_id, user_id),
+            )
             # Уменьшить старую
-            c.execute('SELECT id, count FROM reactions WHERE post_id = ? AND reaction_type = ?', (post_id, current))
+            c.execute('SELECT id, count FROM reactions WHERE post_id = %s AND reaction_type = %s', (post_id, current))
             r = c.fetchone()
             if r:
                 rid, count = r
                 if count <= 1:
-                    c.execute('DELETE FROM reactions WHERE id = ?', (rid,))
+                    c.execute('DELETE FROM reactions WHERE id = %s', (rid,))
                 else:
-                    c.execute('UPDATE reactions SET count = count - 1 WHERE id = ?', (rid,))
+                    c.execute('UPDATE reactions SET count = count - 1 WHERE id = %s', (rid,))
             # Увеличить новую
-            c.execute('SELECT id, count FROM reactions WHERE post_id = ? AND reaction_type = ?', (post_id, reaction_type))
+            c.execute('SELECT id, count FROM reactions WHERE post_id = %s AND reaction_type = %s', (post_id, reaction_type))
             r = c.fetchone()
             if r:
-                c.execute('UPDATE reactions SET count = count + 1 WHERE id = ?', (r[0],))
+                c.execute('UPDATE reactions SET count = count + 1 WHERE id = %s', (r[0],))
             else:
-                c.execute('INSERT INTO reactions (post_id, reaction_type, count) VALUES (?, ?, 1)', (post_id, reaction_type))
+                c.execute(
+                    'INSERT INTO reactions (post_id, reaction_type, count) VALUES (%s, %s, 1)',
+                    (post_id, reaction_type),
+                )
             my_reaction = reaction_type
             is_new = True
         else:
             # Новая реакция
-            c.execute('INSERT INTO user_reactions (post_id, user_id, reaction_type) VALUES (?, ?, ?)',
-                      (post_id, user_id, reaction_type))
-            c.execute('SELECT id, count FROM reactions WHERE post_id = ? AND reaction_type = ?', (post_id, reaction_type))
+            c.execute(
+                'INSERT INTO user_reactions (post_id, user_id, reaction_type) VALUES (%s, %s, %s)',
+                (post_id, user_id, reaction_type),
+            )
+            c.execute('SELECT id, count FROM reactions WHERE post_id = %s AND reaction_type = %s', (post_id, reaction_type))
             r = c.fetchone()
             if r:
-                c.execute('UPDATE reactions SET count = count + 1 WHERE id = ?', (r[0],))
+                c.execute('UPDATE reactions SET count = count + 1 WHERE id = %s', (r[0],))
             else:
-                c.execute('INSERT INTO reactions (post_id, reaction_type, count) VALUES (?, ?, 1)', (post_id, reaction_type))
+                c.execute(
+                    'INSERT INTO reactions (post_id, reaction_type, count) VALUES (%s, %s, 1)',
+                    (post_id, reaction_type),
+                )
             my_reaction = reaction_type
             is_new = True
 
@@ -413,17 +495,17 @@ def delete_post(post_id):
     user = session.get('user')
     if not user or user.get('telegram_id') not in ADMIN_TELEGRAM_IDS:
         return jsonify({'error': 'forbidden'}), 403
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db()
     c = conn.cursor()
-    c.execute('SELECT id, media_path FROM posts WHERE id = ?', (post_id,))
+    c.execute('SELECT id, media_path FROM posts WHERE id = %s', (post_id,))
     row = c.fetchone()
     if not row:
         conn.close()
         return jsonify({'error': 'not_found'}), 404
     _, media_path = row
-    c.execute('DELETE FROM user_reactions WHERE post_id = ?', (post_id,))
-    c.execute('DELETE FROM reactions WHERE post_id = ?', (post_id,))
-    c.execute('DELETE FROM posts WHERE id = ?', (post_id,))
+    c.execute('DELETE FROM user_reactions WHERE post_id = %s', (post_id,))
+    c.execute('DELETE FROM reactions WHERE post_id = %s', (post_id,))
+    c.execute('DELETE FROM posts WHERE id = %s', (post_id,))
     conn.commit()
     conn.close()
     if media_path:
@@ -438,14 +520,13 @@ def delete_post(post_id):
 
 @app.route('/api/channel-info')
 def get_channel_info():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    c = conn.cursor()
-    
+    conn = get_db()
+    c = conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+
     c.execute('SELECT * FROM channel_info WHERE id = 1')
     info = c.fetchone()
     conn.close()
-    
+
     if info:
         return jsonify(dict(info))
     return jsonify({'name': 'Telegram Channel', 'avatar_url': ''})
@@ -453,13 +534,21 @@ def get_channel_info():
 @app.route('/api/channel-info', methods=['POST'])
 def update_channel_info():
     data = request.json
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db()
     c = conn.cursor()
-    
-    c.execute('''INSERT OR REPLACE INTO channel_info (id, name, avatar_url, updated_at)
-                 VALUES (1, ?, ?, CURRENT_TIMESTAMP)''',
-              (data['name'], data.get('avatar_url', '')))
-    
+
+    c.execute(
+        """
+        INSERT INTO channel_info (id, name, avatar_url, updated_at)
+        VALUES (1, %s, %s, CURRENT_TIMESTAMP)
+        ON CONFLICT (id) DO UPDATE SET
+            name = EXCLUDED.name,
+            avatar_url = EXCLUDED.avatar_url,
+            updated_at = EXCLUDED.updated_at
+        """,
+        (data['name'], data.get('avatar_url', '')),
+    )
+
     conn.commit()
     conn.close()
     return jsonify({'status': 'success'})
@@ -492,14 +581,26 @@ def api_create_login_token():
     last_name = (data.get('last_name') or '').strip()
     username = (data.get('username') or '').strip().lstrip('@')
     token = secrets.token_urlsafe(32)
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db()
     c = conn.cursor()
-    c.execute('INSERT INTO login_tokens (token, telegram_id) VALUES (?, ?)', (token, telegram_id))
-    c.execute('''INSERT INTO users (telegram_id, username, first_name, last_name, photo_url)
-                 VALUES (?, ?, ?, ?, COALESCE((SELECT photo_url FROM users WHERE telegram_id = ?), ''))
-                 ON CONFLICT(telegram_id) DO UPDATE SET
-                 username=excluded.username, first_name=excluded.first_name, last_name=excluded.last_name''',
-              (telegram_id, username, first_name, last_name, telegram_id))
+    c.execute('INSERT INTO login_tokens (token, telegram_id) VALUES (%s, %s)', (token, telegram_id))
+    c.execute(
+        """
+        INSERT INTO users (telegram_id, username, first_name, last_name, photo_url)
+        VALUES (
+            %s,
+            %s,
+            %s,
+            %s,
+            COALESCE((SELECT photo_url FROM users WHERE telegram_id = %s), '')
+        )
+        ON CONFLICT (telegram_id) DO UPDATE SET
+            username = EXCLUDED.username,
+            first_name = EXCLUDED.first_name,
+            last_name = EXCLUDED.last_name
+        """,
+        (telegram_id, username, first_name, last_name, telegram_id),
+    )
     conn.commit()
     conn.close()
     base = SITE_BASE_URL or request.host_url.rstrip('/')
@@ -530,14 +631,20 @@ def auth_telegram():
         'photo_url': photo_url
     }
     user['is_admin'] = user['telegram_id'] in ADMIN_TELEGRAM_IDS
-    conn = sqlite3.connect(DB_PATH)
+    conn = get_db()
     c = conn.cursor()
-    c.execute('''INSERT INTO users (telegram_id, username, first_name, last_name, photo_url)
-                 VALUES (?, ?, ?, ?, ?)
-                 ON CONFLICT(telegram_id) DO UPDATE SET
-                 username=excluded.username, first_name=excluded.first_name,
-                 last_name=excluded.last_name, photo_url=excluded.photo_url''',
-              (telegram_id, username, first_name, last_name, photo_url))
+    c.execute(
+        """
+        INSERT INTO users (telegram_id, username, first_name, last_name, photo_url)
+        VALUES (%s, %s, %s, %s, %s)
+        ON CONFLICT (telegram_id) DO UPDATE SET
+            username = EXCLUDED.username,
+            first_name = EXCLUDED.first_name,
+            last_name = EXCLUDED.last_name,
+            photo_url = EXCLUDED.photo_url
+        """,
+        (telegram_id, username, first_name, last_name, photo_url),
+    )
     conn.commit()
     conn.close()
     session['user'] = user
