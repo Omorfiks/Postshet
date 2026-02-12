@@ -76,6 +76,37 @@ async def create_login_token(telegram_id: int, first_name: str = "", last_name: 
     return None
 
 
+async def download_channel_avatar(chat_id: int, destination: str) -> bool:
+    """Скачать аватарку канала"""
+    try:
+        # Получаем информацию о чате
+        chat = await bot.get_chat(chat_id)
+        if chat.photo:
+            # Скачиваем большое фото (photo.big_file_id)
+            await bot.download(chat.photo.big_file_id, destination)
+            return True
+    except Exception as e:
+        print(f"Ошибка скачивания аватарки канала: {e}")
+    return False
+
+
+async def update_channel_info(name: str, avatar_url: str = ""):
+    """Обновить информацию о канале через Flask API"""
+    async with aiohttp.ClientSession() as session:
+        data = {
+            'name': name,
+            'avatar_url': avatar_url or ''
+        }
+        try:
+            async with session.post(f"{API_BASE_URL}/channel-info", json=data) as resp:
+                if resp.status == 200:
+                    print(f"✅ Информация о канале обновлена: {name}")
+                    return True
+        except Exception as e:
+            print(f"Ошибка обновления channel-info: {e}")
+        return False
+
+
 @dp.message(F.text.startswith("/start"))
 async def handle_start(message: Message):
     """Вход на сайт: /start login — бот присылает ссылку для входа."""
@@ -111,6 +142,21 @@ async def handle_channel_post(message: Message):
     if message.chat.username and f"@{message.chat.username}" != CHANNEL_USERNAME:
         return
 
+    # Обновляем информацию о канале (название и аватарка)
+    channel_name = message.chat.title or "Telegram Channel"
+    avatar_url = ""
+    
+    # Пытаемся скачать аватарку канала
+    if message.chat.photo:
+        avatar_filename = f"channel_avatar_{message.chat.id}.jpg"
+        avatar_path = os.path.join(UPLOAD_FOLDER, avatar_filename)
+        if await download_channel_avatar(message.chat.id, avatar_path):
+            avatar_url = f"/uploads/{avatar_filename}"
+    
+    # Обновляем информацию о канале в БД (делаем это при каждом посте)
+    await update_channel_info(channel_name, avatar_url)
+
+    # Обработка медиа из поста
     media_type = None
     file_id = None
     ext = "jpg"
