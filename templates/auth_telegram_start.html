@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Вход через Telegram</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; text-align: center; margin: 0; }
+        .widget-wrap { min-height: 60px; margin: 20px 0; }
+        .widget-wrap iframe { border: none; }
+        p { color: #666; font-size: 14px; }
+    </style>
+</head>
+<body>
+    <p>Войдите через Telegram</p>
+    <div class="widget-wrap">
+        {% if telegram_bot_username and callback_url %}
+        <script async src="https://telegram.org/js/telegram-widget.js?22"
+                data-telegram-login="{{ telegram_bot_username }}"
+                data-size="large"
+                data-radius="8"
+                data-auth-url="{{ callback_url }}"
+                data-request-access="write"></script>
+        {% else %}
+        <p>Настройте TELEGRAM_BOT_USERNAME и перезапустите сервер.</p>
+        {% endif %}
+    </div>
+    <p>Если кнопка не видна — нажмите на тёмную область выше.</p>
+</body>
+</html>

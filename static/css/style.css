@@ -1,0 +1,597 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    background-color: #f5f5f5;
+    color: #333;
+}
+
+/* Header */
+.header {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 20px 0;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.header-content {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.channel-info {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+/* Блок входа / пользователь */
+.header-auth {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.auth-login-wrap {
+    display: flex;
+    align-items: center;
+    min-width: 220px;
+    min-height: 44px;
+    position: relative;
+}
+
+.auth-login-wrap iframe {
+    width: 240px !important;
+    height: 44px !important;
+    min-width: 240px !important;
+    min-height: 44px !important;
+    border: none !important;
+    display: block !important;
+}
+
+.btn-telegram-login {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 8px 16px;
+    min-height: 44px;
+    font-size: 14px;
+    font-weight: 500;
+    color: white;
+    background: #0088cc;
+    border: none;
+    border-radius: 8px;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+}
+
+.btn-telegram-login:hover {
+    background: #006699;
+    color: white;
+}
+
+.btn-telegram-login:active {
+    transform: scale(0.98);
+}
+
+.auth-placeholder {
+    font-size: 14px;
+    opacity: 0.9;
+}
+
+.auth-user-wrap {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.auth-avatar-wrap {
+    position: relative;
+    flex-shrink: 0;
+    width: 40px;
+    height: 40px;
+}
+
+.auth-user-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.9);
+    object-fit: cover;
+    background: rgba(255,255,255,0.2);
+}
+
+.auth-admin-badge {
+    font-size: 12px;
+    font-weight: 600;
+    color: #ffd700;
+    text-shadow: 0 0 1px rgba(0,0,0,0.5);
+    white-space: nowrap;
+}
+
+.auth-user-avatar[src=""],
+.auth-user-avatar:not([src]) {
+    display: none;
+}
+
+.auth-user-avatar-fallback {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.9);
+    background: rgba(255,255,255,0.35);
+    color: white;
+    font-size: 18px;
+    font-weight: 600;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.2);
+}
+
+.btn-logout {
+    padding: 6px 14px;
+    font-size: 13px;
+    border: 1px solid rgba(255,255,255,0.7);
+    border-radius: 8px;
+    background: rgba(255,255,255,0.2);
+    color: white;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s;
+}
+
+.btn-logout:hover {
+    background: rgba(255,255,255,0.35);
+    border-color: white;
+}
+
+.channel-avatar {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    border: 3px solid white;
+    object-fit: cover;
+    background-color: white;
+}
+
+.channel-name {
+    font-size: 24px;
+    font-weight: 600;
+}
+
+/* Main Content */
+.main-content {
+    max-width: 1200px;
+    margin: 30px auto;
+    padding: 0 20px;
+}
+
+.posts-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 25px;
+    perspective: 1000px;
+}
+
+/* Post Card — стеклянная карточка с толщиной */
+.post {
+    background: linear-gradient(145deg, rgba(255,255,255,0.28) 0%, rgba(255,255,255,0.18) 100%);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    border-radius: 12px;
+    position: relative;
+    transform-style: preserve-3d;
+    box-shadow:
+        0 2px 8px rgba(0,0,0,0.08),
+        inset 0 1px 0 rgba(255,255,255,0.4),
+        inset 4px 4px 12px rgba(255,255,255,0.08),
+        inset 0 -1px 4px rgba(0,0,0,0.04);
+    transition: box-shadow 0.2s, transform 0.15s ease-out;
+}
+
+/* Задняя грань — толщина стекла */
+.post::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 12px;
+    background: rgba(180, 200, 230, 0.18);
+    transform: translateZ(-24px);
+    pointer-events: none;
+}
+
+.post-inner {
+    position: relative;
+    z-index: 1;
+    overflow: hidden;
+    border-radius: 12px;
+    transform: translateZ(0.5px);
+}
+
+.post:hover {
+    box-shadow:
+        0 6px 20px rgba(0,0,0,0.1),
+        inset 0 1px 0 rgba(255,255,255,0.5),
+        inset 4px 4px 12px rgba(255,255,255,0.1),
+        inset 0 -1px 4px rgba(0,0,0,0.04);
+}
+
+.post-media {
+    width: 100%;
+    display: block;
+    cursor: pointer;
+}
+
+.post-media img {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+.post-media video {
+    width: 100%;
+    height: auto;
+    display: block;
+}
+
+.post-caption {
+    padding: 15px;
+    font-size: 14px;
+    line-height: 1.5;
+    color: #555;
+}
+
+.post-footer {
+    padding: 15px;
+    border-top: 1px solid #eee;
+}
+
+.counter-container {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.counter-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    cursor: pointer;
+    padding: 6px 12px;
+    border: 1px solid #ddd;
+    border-radius: 20px;
+    background-color: #f8f8f8;
+    transition: all 0.2s;
+    font-size: 14px;
+}
+
+.counter-item:hover {
+    background-color: #e8e8e8;
+    transform: scale(1.05);
+}
+
+.counter-item.my-reaction {
+    background-color: #e3f2fd;
+    border-color: #2196f3;
+    box-shadow: 0 0 0 1px rgba(33, 150, 243, 0.3);
+}
+
+.counter-item img {
+    width: 18px;
+    height: 18px;
+    display: block;
+}
+
+.counter-value {
+    font-weight: 600;
+    color: #333;
+}
+
+.counter-value-wrap {
+    display: inline-block;
+    height: 1.2em;
+    overflow: hidden;
+    vertical-align: middle;
+    position: relative;
+    min-width: 1.2em;
+}
+
+.counter-value-wrap .counter-value {
+    display: block;
+    text-align: center;
+    line-height: 1.2em;
+    transition: transform 0.25s ease-out;
+}
+
+.counter-value-wrap .counter-value.next {
+    position: absolute;
+    left: 0;
+    right: 0;
+}
+
+/* Увеличение: новое число прокручивается сверху */
+.counter-value-wrap.roll-up .counter-value.current {
+    transform: translateY(0);
+}
+.counter-value-wrap.roll-up .counter-value.next {
+    top: 0;
+    transform: translateY(-100%);
+}
+.counter-value-wrap.roll-up.animating .counter-value.current {
+    transform: translateY(100%);
+}
+.counter-value-wrap.roll-up.animating .counter-value.next {
+    transform: translateY(0);
+}
+
+/* Уменьшение: новое число прокручивается снизу */
+.counter-value-wrap.roll-down .counter-value.current {
+    transform: translateY(0);
+}
+.counter-value-wrap.roll-down .counter-value.next {
+    bottom: 0;
+    transform: translateY(100%);
+}
+.counter-value-wrap.roll-down.animating .counter-value.current {
+    transform: translateY(-100%);
+}
+.counter-value-wrap.roll-down.animating .counter-value.next {
+    transform: translateY(0);
+}
+
+/* Reactions Panel */
+.reactions-container {
+    position: fixed;
+    display: none;
+    z-index: 1000;
+    width: 280px;
+    max-height: 200px;
+    backdrop-filter: blur(10px);
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 25px;
+    padding: 15px;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+    border: 1px solid rgba(255,255,255,0.3);
+}
+
+.reactions-scroll {
+    max-height: 170px;
+    overflow-y: auto;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(32px, 1fr));
+    gap: 8px;
+}
+
+.reaction {
+    display: inline-block;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+    padding: 4px;
+    border-radius: 50%;
+}
+
+.reaction:hover {
+    transform: scale(1.3);
+    background-color: rgba(0,0,0,0.05);
+}
+
+.reaction.active {
+    transform: scale(1.4);
+    filter: drop-shadow(0 0 5px rgba(0,0,0,0.3));
+}
+
+.reaction img {
+    width: 28px !important;
+    height: 28px !important;
+    display: block;
+}
+
+/* Animation */
+.emoji-animation {
+    position: fixed;
+    font-size: 20px;
+    z-index: 999;
+    pointer-events: none;
+    animation: floatUp 1s forwards;
+}
+
+@keyframes floatUp {
+    0% { 
+        transform: translateY(0) scale(1); 
+        opacity: 1; 
+    }
+    100% { 
+        transform: translateY(-40px) scale(1.2); 
+        opacity: 0; 
+    }
+}
+
+/* Scrollbar */
+.reactions-scroll::-webkit-scrollbar {
+    width: 6px;
+}
+
+.reactions-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.reactions-scroll::-webkit-scrollbar-thumb {
+    background: #ccc;
+    border-radius: 3px;
+}
+
+.reactions-scroll::-webkit-scrollbar-thumb:hover {
+    background: #999;
+}
+
+/* Loading */
+.loading {
+    text-align: center;
+    padding: 40px;
+    color: #999;
+}
+
+/* Модальное окно: требуется авторизация */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 2000;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.modal-box {
+    background: #fff;
+    border-radius: 12px;
+    padding: 24px;
+    max-width: 360px;
+    width: 100%;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.modal-title {
+    margin: 0 0 12px;
+    font-size: 1.25rem;
+    color: #333;
+}
+
+.modal-text {
+    margin: 0 0 20px;
+    color: #666;
+    font-size: 0.95rem;
+    line-height: 1.4;
+}
+
+.modal-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+}
+
+.modal-actions .btn-telegram-login {
+    margin: 0;
+}
+
+.btn-modal-close {
+    padding: 8px 16px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    background: #f5f5f5;
+    cursor: pointer;
+    font-size: 14px;
+    color: #333;
+}
+
+.btn-modal-close:hover {
+    background: #eee;
+}
+
+.btn-delete-confirm {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 8px;
+    background: #c62828;
+    color: #fff;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.btn-delete-confirm:hover {
+    background: #b71c1c;
+}
+
+/* Кнопка удаления поста (админ) — правый верхний угол карточки */
+.post-delete-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    z-index: 10;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: none;
+    border-radius: 50%;
+    background: rgba(0, 0, 0, 0.5);
+    color: #fff;
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.2s;
+}
+
+.post-delete-btn:hover {
+    background: rgba(198, 40, 40, 0.9);
+}
+
+/* На телефоне — уменьшенные эмодзи */
+@media (max-width: 768px), (hover: none) {
+    .reaction {
+        font-size: 22px;
+    }
+    .reaction img {
+        width: 22px !important;
+        height: 22px !important;
+    }
+    .counter-item img {
+        width: 14px !important;
+        height: 14px !important;
+    }
+    .emoji-animation {
+        font-size: 18px;
+    }
+}
+
+/* Телефон: непрокручиваемая ширина, 2 поста в строке */
+@media (max-width: 768px) {
+    html, body {
+        overflow-x: hidden;
+        max-width: 100vw;
+    }
+    .main-content {
+        max-width: 100%;
+        padding-left: 8px;
+        padding-right: 8px;
+    }
+    .posts-container {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+    }
+    .post {
+        min-width: 0;
+    }
+    .header-content {
+        padding-left: 10px;
+        padding-right: 10px;
+    }
+    .auth-user-wrap {
+        gap: 8px;
+    }
+    .btn-logout {
+        flex-shrink: 0;
+    }
+    .auth-login-wrap {
+        min-width: 0;
+    }
+    .auth-login-wrap iframe {
+        width: 180px !important;
+        min-width: 180px !important;
+    }
+}

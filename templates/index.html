@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Витрина мемов</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <div class="channel-info">
+                <img id="channel-avatar" src="" alt="Channel Avatar" class="channel-avatar">
+                <h1 id="channel-name" class="channel-name">Загрузка...</h1>
+            </div>
+            <div class="header-auth">
+                <div id="auth-login-wrap" class="auth-login-wrap">
+                    {% if telegram_bot_username %}
+                    <a id="auth-login-link" href="{{ url_for('auth_telegram_start') }}"
+                       data-desktop-href="{{ url_for('auth_telegram_start') }}"
+                       data-mobile-href="{{ url_for('auth_telegram_start') }}"
+                       target="telegram_login"
+                       onclick="window.open(this.href, 'telegram_login', 'width=420,height=500'); return false;"
+                       class="btn-telegram-login">Войти через Telegram</a>
+                    {% else %}
+                    <span class="auth-placeholder">Войти (настройте TELEGRAM_BOT_USERNAME)</span>
+                    {% endif %}
+                </div>
+                <div id="auth-user-wrap" class="auth-user-wrap" style="display: none;">
+                    <div class="auth-avatar-wrap">
+                        <img id="auth-user-avatar" class="auth-user-avatar" src="" alt="" title="">
+                        <span id="auth-user-avatar-fallback" class="auth-user-avatar-fallback" aria-hidden="true"></span>
+                    </div>
+                    <span id="auth-admin-badge" class="auth-admin-badge" style="display: none;">Вы — админ!</span>
+                    <button type="button" id="auth-logout" class="btn-logout">Выйти</button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="posts-container" id="posts-container">
+            <!-- Посты будут добавлены динамически -->
+        </div>
+    </main>
+
+    <!-- Reactions Panel -->
+    <div class="reactions-container" id="reactions">
+        <div class="reactions-scroll" id="reactions-scroll">
+            <!-- Реакции будут добавлены динамически -->
+        </div>
+    </div>
+
+    <!-- Модальное окно: требуется авторизация -->
+    <div class="modal-overlay" id="auth-required-modal" role="dialog" aria-modal="true" aria-labelledby="auth-required-title" style="display: none;">
+        <div class="modal-box">
+            <h2 class="modal-title" id="auth-required-title">Необходимо авторизоваться</h2>
+            <p class="modal-text">Чтобы ставить реакции на посты, войдите через Telegram.</p>
+            <div class="modal-actions">
+                <a id="auth-required-modal-link" href="{{ url_for('auth_telegram_start') }}"
+                   data-desktop-href="{{ url_for('auth_telegram_start') }}"
+                   data-mobile-href="{{ url_for('auth_telegram_start') }}"
+                   target="telegram_login"
+                   onclick="window.open(this.href, 'telegram_login', 'width=420,height=500'); document.getElementById('auth-required-modal').style.display='none'; return false;"
+                   class="btn-telegram-login">Войти через Telegram</a>
+                <button type="button" id="auth-required-modal-close" class="btn-modal-close">Закрыть</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно: подтверждение удаления поста -->
+    <div class="modal-overlay" id="delete-post-modal" role="dialog" aria-modal="true" aria-labelledby="delete-post-title" style="display: none;">
+        <div class="modal-box">
+            <h2 class="modal-title" id="delete-post-title">Удалить пост?</h2>
+            <p class="modal-text">Пост будет удалён без возможности восстановления.</p>
+            <div class="modal-actions">
+                <button type="button" id="delete-post-confirm" class="btn-delete-confirm">Удалить</button>
+                <button type="button" id="delete-post-cancel" class="btn-modal-close">Отмена</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
