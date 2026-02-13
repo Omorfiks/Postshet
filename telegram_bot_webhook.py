@@ -8,6 +8,14 @@ from aiogram import Bot, Dispatcher, F
 from aiogram.types import Message
 from aiohttp import web
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
+import cloudinary
+import cloudinary.uploader
+cloudinary.config( 
+  cloud_name = "dsutlowxw", 
+  api_key = "869882181722749", 
+  api_secret = os.environ.get("CLOUDINARY_API_SECRET"),
+  secure = True
+)
 load_dotenv()
 
 # Конфигурация
@@ -138,52 +146,54 @@ async def handle_start(message: Message):
 # Используем router для постов канала (channel_post)
 @dp.channel_post()
 async def handle_channel_post(message: Message):
-    # Проверка юзернейма (опционально, если бот только в одном канале)
     if message.chat.username and f"@{message.chat.username}" != CHANNEL_USERNAME:
         return
 
-    # Обновляем информацию о канале (название и аватарка)
-    channel_name = message.chat.title or "Telegram Channel"
-    avatar_url = ""
-    
-    # Пытаемся скачать аватарку канала
-    if message.chat.photo:
-        avatar_filename = f"channel_avatar_{message.chat.id}.jpg"
-        avatar_path = os.path.join(UPLOAD_FOLDER, avatar_filename)
-        if await download_channel_avatar(message.chat.id, avatar_path):
-            avatar_url = f"/uploads/{avatar_filename}"
-    
-    # Обновляем информацию о канале в БД (делаем это при каждом посте)
-    await update_channel_info(channel_name, avatar_url)
-
-    # Обработка медиа из поста
     media_type = None
     file_id = None
-    ext = "jpg"
 
+    # Определяем тип медиа
     if message.photo:
         file_id = message.photo[-1].file_id
         media_type = "photo"
-        ext = "jpg"
     elif message.video:
         file_id = message.video.file_id
         media_type = "video"
-        ext = "mp4"
     elif message.animation:
         file_id = message.animation.file_id
         media_type = "video"
-        ext = "mp4" # Сейвим гифки как видео
 
     if file_id:
-        filename = f"{message.message_id}_{datetime.now().strftime('%H%M%S')}.{ext}"
-        full_path = os.path.join(UPLOAD_FOLDER, filename)
-        
-        if await download_media(file_id, full_path):
-            # Передаем относительный путь для сайта
-            relative_path = filename 
-            await send_to_api(message.message_id, media_type, relative_path, message.caption)
-            print(f"✅ Пост {message.message_id} отправлен на сайт.")
+        # 1. Сначала получаем информацию о файле в TG, чтобы достать его путь
+        file = await bot.get_file(file_id)
+        file_url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file.file_path}"
 
+        try:
+            # 2. Загружаем напрямую из Telegram в Cloudinary
+            # Это быстрее и не требует сохранения временного файла на диске
+            upload_result = cloudinary.uploader.upload(
+                file_url,
+                resource_type = "auto", # важно для поддержки и фото, и видео
+                folder = "telegram_posts"
+            )
+            
+            # 3. Получаем постоянную ссылку
+            cloudinary_url = upload_result.get("secure_url")
+
+            # 4. Отправляем в API уже ССЫЛКУ, а не путь к файлу
+            success = await send_to_api(
+                telegram_id=message.message_id,
+                media_type=media_type,
+                media_path=cloudinary_url, # Теперь здесь URL
+                caption=message.caption
+            )
+            
+            if success:
+                print(f"✅ Пост {message.message_id} с фото из Cloudinary отправлен!")
+
+        except Exception as e:
+            print(f"❌ Ошибка Cloudinary: {e}")
+            
 async def on_startup(bot: Bot):
     # Устанавливаем Webhook при запуске
     webhook_url = f"{os.environ.get('RENDER_EXTERNAL_URL')}/webhook"
