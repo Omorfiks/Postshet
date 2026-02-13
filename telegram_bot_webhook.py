@@ -11,9 +11,6 @@ from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_applicati
 import cloudinary
 import cloudinary.uploader
 cloudinary.config( 
-  cloud_name = "dsutlowxw", 
-  api_key = "869882181722749", 
-  api_secret = os.environ.get("CLOUDINARY_API_SECRET"),
   secure = True
 )
 load_dotenv()
@@ -179,7 +176,7 @@ async def handle_channel_post(message: Message):
             
             # 3. Получаем постоянную ссылку
             cloudinary_url = upload_result.get("secure_url")
-
+            print(cloudinary_url)
             # 4. Отправляем в API уже ССЫЛКУ, а не путь к файлу
             success = await send_to_api(
                 telegram_id=message.message_id,
