@@ -161,35 +161,41 @@ async def handle_channel_post(message: Message):
         media_type = "video"
 
     if file_id:
-        # 1. Сначала получаем информацию о файле в TG, чтобы достать его путь
-        file = await bot.get_file(file_id)
-        file_url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file.file_path}"
+            # 1. Получаем путь файла в Telegram
+            file = await bot.get_file(file_id)
+            file_url = f"https://api.telegram.org/file/bot{BOT_TOKEN}/{file.file_path}"
 
-        try:
-            # 2. Загружаем напрямую из Telegram в Cloudinary
-            # Это быстрее и не требует сохранения временного файла на диске
-            upload_result = cloudinary.uploader.upload(
-                file_url,
-                resource_type = "auto", # важно для поддержки и фото, и видео
-                folder = "telegram_posts"
-            )
-            
-            # 3. Получаем постоянную ссылку
-            cloudinary_url = upload_result.get("secure_url")
-            print(cloudinary_url)
-            # 4. Отправляем в API уже ССЫЛКУ, а не путь к файлу
-            success = await send_to_api(
-                telegram_id=message.message_id,
-                media_type=media_type,
-                media_path=cloudinary_url, # Теперь здесь URL
-                caption=message.caption
-            )
-            
-            if success:
-                print(f"✅ Пост {message.message_id} с фото из Cloudinary отправлен!")
+            try:
+                # 2. Загружаем в Cloudinary
+                # Добавим resource_type="auto", чтобы корректно грузились и фото, и видео (GIF)
+                upload_result = cloudinary.uploader.upload(
+                    file_url, 
+                    folder="telegram_posts",
+                    resource_type="auto" 
+                )
+                
+                # 3. Достаем прямую безопасную ссылку
+                cloudinary_url = upload_result.get("secure_url")
+                
+                if not cloudinary_url:
+                    print("❌ Не удалось получить URL от Cloudinary")
+                    return
 
-        except Exception as e:
-            print(f"❌ Ошибка Cloudinary: {e}")
+                print(f"🔗 Ссылка Cloudinary: {cloudinary_url}")
+
+                # 4. Отправляем ССЫЛКУ в твой Flask API
+                success = await send_to_api(
+                    telegram_id=message.message_id,
+                    media_type=media_type,
+                    media_path=cloudinary_url, # ВАЖНО: Flask должен записать это в БД «как есть»
+                    caption=message.caption
+                )
+                
+                if success:
+                    print(f"✅ Пост {message.message_id} успешно сохранен в БД через API")
+
+            except Exception as e:
+                print(f"❌ Ошибка Cloudinary или API: {e}")
             
 async def on_startup(bot: Bot):
     # Устанавливаем Webhook при запуске

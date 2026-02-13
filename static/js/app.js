@@ -263,13 +263,18 @@ function createPostElement(post) {
     postDiv.dataset.postId = post.id;
     
     let mediaHTML = '';
-    // Добавляем префикс папки перед путем к файлу
-    const fullMediaPath = '/uploads/' + post.media_path;
+    
+    // ПРОВЕРКА: Если путь начинается с http, используем его как есть.
+    // Если нет (старый формат) — добавляем /uploads/
+    const isCloudinary = post.media_path && post.media_path.startsWith('http');
+    const fullMediaPath = isCloudinary ? post.media_path : ('/uploads/' + post.media_path);
 
     if (post.media_type === 'photo') {
-        mediaHTML = `<img src="${fullMediaPath}" alt="Post" class="post-media">`;
-    } else if (post.media_type === 'video') {
-        mediaHTML = `<video src="${fullMediaPath}" controls class="post-media"></video>`;
+        mediaHTML = `<img src="${fullMediaPath}" alt="Post" class="post-media" loading="lazy">`;
+    } else if (post.media_type === 'video' || post.media_type === 'animation') {
+        // Добавим autoplay и loop для анимаций (гифок из TG), так как они приходят как видео
+        const isAnimation = post.media_type === 'animation';
+        mediaHTML = `<video src="${fullMediaPath}" ${isAnimation ? 'autoplay loop muted playsinline' : 'controls'} class="post-media"></video>`;
     }
     
     const captionHTML = post.caption ? `<div class="post-caption">${escapeHtml(post.caption)}</div>` : '';
