@@ -2,6 +2,7 @@ const API_BASE = '/api';
 let currentPostId = null;
 let currentUser = null; // Текущий пользователь (для админ-кнопки удаления)
 let emojiAnimations = new Set(); // Отслеживание активных анимаций
+let masonryInstance = null; // Masonry layout для постов
 
 function isMobile() {
     return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) ||
@@ -233,6 +234,34 @@ function playEmojiAnimation(element, emojiData) {
     }, 1000);
 }
 
+// Параметры Masonry по ширине контейнера (десктоп / мобилка)
+function getMasonryOptions(container) {
+    const w = container ? container.offsetWidth : document.getElementById('posts-container').offsetWidth;
+    const isMobile = w <= 768;
+    return {
+        itemSelector: '.post',
+        columnWidth: isMobile ? (w - 10) / 2 : 350,
+        gutter: isMobile ? 10 : 25,
+        percentPosition: true
+    };
+}
+
+// Инициализация или перерасчёт Masonry после загрузки постов
+function initMasonry(container) {
+    if (!container || !container.querySelector('.post')) return;
+    if (masonryInstance) {
+        masonryInstance.destroy();
+        masonryInstance = null;
+    }
+    const options = getMasonryOptions(container);
+    masonryInstance = new Masonry(container, options);
+    if (typeof imagesLoaded !== 'undefined') {
+        imagesLoaded(container, function() {
+            if (masonryInstance) masonryInstance.layout();
+        });
+    }
+}
+
 // Загрузка постов
 async function loadPosts() {
     try {
@@ -240,6 +269,10 @@ async function loadPosts() {
         const posts = await response.json();
         
         const container = document.getElementById('posts-container');
+        if (masonryInstance) {
+            masonryInstance.destroy();
+            masonryInstance = null;
+        }
         container.innerHTML = '';
         
         if (posts.length === 0) {
@@ -251,6 +284,7 @@ async function loadPosts() {
             const postElement = createPostElement(post);
             container.appendChild(postElement);
         });
+        initMasonry(container);
     } catch (error) {
         console.error('Ошибка при загрузке постов:', error);
     }
@@ -491,7 +525,13 @@ async function confirmDeletePost() {
         const response = await fetch(`${API_BASE}/posts/${postId}`, { method: 'DELETE' });
         if (response.ok) {
             const card = document.querySelector(`.post[data-post-id="${postId}"]`);
-            if (card) card.remove();
+            if (card) {
+                card.remove();
+                if (masonryInstance) {
+                    masonryInstance.reloadItems();
+                    masonryInstance.layout();
+                }
+            }
         }
     } catch (error) {
         console.error('Ошибка при удалении поста:', error);
@@ -696,4 +736,19 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Обновление постов каждые 30 секунд
     setInterval(loadPosts, 30000);
+
+    // Перерасчёт Masonry при изменении размера окна
+    let resizeTimeout;
+    window.addEventListener('resize', function() {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(function() {
+            if (!masonryInstance) return;
+            const container = document.getElementById('posts-container');
+            if (!container || !container.querySelector('.post')) return;
+            const opts = getMasonryOptions(container);
+            masonryInstance.options.columnWidth = opts.columnWidth;
+            masonryInstance.options.gutter = opts.gutter;
+            masonryInstance.layout();
+        }, 150);
+    });
 });
