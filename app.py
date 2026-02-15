@@ -15,6 +15,9 @@ from urllib.error import HTTPError, URLError
 import psycopg2
 import psycopg2.extras
 
+# Если при старте PostgreSQL недоступен (таймаут и т.п.), сервер всё равно запустится для проверки вёрстки
+_db_available = True
+
 load_dotenv()
 
 app = Flask(__name__)
@@ -57,6 +60,9 @@ def get_db():
     Открыть соединение с PostgreSQL.
     Использует DATABASE_URL из окружения.
     """
+    global _db_available
+    if not _db_available:
+        raise RuntimeError("База данных недоступна (при старте было подключение по таймауту). Разбудите БД на Render или проверьте сеть.")
     if not DATABASE_URL:
         raise RuntimeError("DATABASE_URL не задан в окружении")
     return psycopg2.connect(DATABASE_URL)
@@ -196,7 +202,18 @@ def init_db():
     conn.commit()
     conn.close()
 
-init_db()
+
+def _try_init_db():
+    global _db_available
+    try:
+        init_db()
+    except psycopg2.OperationalError:
+        _db_available = False
+        print("Warning: PostgreSQL недоступен (таймаут/сеть). Сервер запущен для проверки вёрстки; API постов не будет работать.")
+        print("  Разбудите БД в панели Render или проверьте DATABASE_URL.")
+
+
+_try_init_db()
 
 @app.route('/')
 def index():

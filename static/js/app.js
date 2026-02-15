@@ -234,7 +234,7 @@ function playEmojiAnimation(element, emojiData) {
     }, 1000);
 }
 
-// Параметры Masonry: 25px отступ по горизонтали и вертикали; ширина поста подстраивается
+// Параметры Masonry: ширина поста чуть меньше 20%/50%, между постами по горизонтали 25px
 function getMasonryOptions(container) {
     const el = container || document.getElementById('posts-container');
     const w = el ? el.offsetWidth : 0;
