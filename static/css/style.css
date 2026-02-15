@@ -178,16 +178,18 @@ body {
     padding: 0 20px;
 }
 
-/* Masonry: контейнер без grid, позиционирование через JS */
+/* Сетка: ПК — 5 постов в строке (20% ширины каждый), высота по контенту */
 .posts-container {
-    position: relative;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 25px;
+    align-items: start;
     perspective: 1000px;
 }
 
-/* Post Card — стеклянная карточка с толщиной; отступ снизу для Masonry; ширина задаётся Masonry */
+/* Post Card — ширина из сетки (20% на ПК), высота автоматически по контенту */
 .post {
-    margin-bottom: 25px;
-    min-width: 0; /* не растягиваться по контенту */
+    min-width: 0;
     box-sizing: border-box;
     overflow: hidden;
     background: linear-gradient(145deg, rgba(255,255,255,0.28) 0%, rgba(255,255,255,0.18) 100%);
@@ -583,9 +585,12 @@ body {
         padding-left: 8px;
         padding-right: 8px;
     }
+    .posts-container {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 10px;
+    }
     .post {
         min-width: 0;
-        margin-bottom: 10px;
     }
     .header-content {
         padding-left: 10px;
