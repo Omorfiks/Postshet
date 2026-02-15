@@ -178,17 +178,15 @@ body {
     padding: 0 20px;
 }
 
-/* Сетка: ПК — 5 постов в строке (20% ширины каждый), высота по контенту */
+/* Masonry (Pinterest): контейнер без grid, позиционирование через JS */
 .posts-container {
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    gap: 25px;
-    align-items: start;
+    position: relative;
     perspective: 1000px;
 }
 
-/* Post Card — ширина из сетки (20% на ПК), высота автоматически по контенту */
+/* Post Card — ширина задаётся Masonry (5 кол. ПК / 2 кол. телефон), высота по контенту */
 .post {
+    margin-bottom: 25px;
     min-width: 0;
     box-sizing: border-box;
     overflow: hidden;
@@ -585,12 +583,9 @@ body {
         padding-left: 8px;
         padding-right: 8px;
     }
-    .posts-container {
-        grid-template-columns: repeat(2, 1fr);
-        gap: 10px;
-    }
     .post {
         min-width: 0;
+        margin-bottom: 10px;
     }
     .header-content {
         padding-left: 10px;
