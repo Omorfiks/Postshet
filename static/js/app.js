@@ -199,8 +199,9 @@ async function handleReactionClick(element, postId) {
     }
 }
 
-// Проигрывание анимации эмодзи (только 1 цикл)
+// Проигрывание анимации эмодзи (только 1 цикл); на мобильных отключено
 function playEmojiAnimation(element, emojiData) {
+    if (isMobile()) return;
     const rect = element.getBoundingClientRect();
     const x = rect.left + rect.width / 2;
     const y = rect.top + rect.height / 2;
@@ -559,8 +560,9 @@ function showReactionsPanel(e) {
     }, 0);
 }
 
-// Проигрывание анимации из счетчика
+// Проигрывание анимации из счетчика; на мобильных отключено
 function playEmojiAnimationFromCounter(counterElement, emojiData, postId) {
+    if (isMobile()) return;
     const rect = counterElement.getBoundingClientRect();
     const x = rect.left + rect.width / 2;
     const y = rect.top + rect.height / 2;

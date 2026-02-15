@@ -573,8 +573,11 @@ body {
     }
 }
 
-/* Телефон: непрокручиваемая ширина, 2 поста в строке */
+/* Телефон: непрокручиваемая ширина, 2 поста в строке; анимации эмодзи отключены */
 @media (max-width: 768px) {
+    .emoji-animation {
+        display: none !important;
+    }
     html, body {
         overflow-x: hidden;
         max-width: 100vw;
