@@ -184,9 +184,12 @@ body {
     perspective: 1000px;
 }
 
-/* Post Card — стеклянная карточка с толщиной; отступ снизу для Masonry */
+/* Post Card — стеклянная карточка с толщиной; отступ снизу для Masonry; ширина задаётся Masonry */
 .post {
     margin-bottom: 25px;
+    min-width: 0; /* не растягиваться по контенту */
+    box-sizing: border-box;
+    overflow: hidden;
     background: linear-gradient(145deg, rgba(255,255,255,0.28) 0%, rgba(255,255,255,0.18) 100%);
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
@@ -218,6 +221,8 @@ body {
     overflow: hidden;
     border-radius: 12px;
     transform: translateZ(0.5px);
+    max-width: 100%;
+    box-sizing: border-box;
 }
 
 .post:hover {
@@ -230,20 +235,28 @@ body {
 
 .post-media {
     width: 100%;
+    max-width: 100%;
     display: block;
     cursor: pointer;
+    box-sizing: border-box;
 }
 
 .post-media img {
     width: 100%;
+    max-width: 100%;
     height: auto;
     display: block;
+    object-fit: contain;
+    vertical-align: top;
 }
 
 .post-media video {
     width: 100%;
+    max-width: 100%;
     height: auto;
     display: block;
+    object-fit: contain;
+    vertical-align: top;
 }
 
 .post-caption {
