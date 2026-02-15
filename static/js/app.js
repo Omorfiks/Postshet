@@ -234,12 +234,12 @@ function playEmojiAnimation(element, emojiData) {
     }, 1000);
 }
 
-// Параметры Masonry: ширина поста 15% на ПК, 50% на телефоне; между постами 25px
+// Параметры Masonry: ПК — 15% ширина поста, 25px зазор; телефон — 2 колонки по 50%, зазор 10px
 function getMasonryOptions(container) {
     const el = container || document.getElementById('posts-container');
     const w = el ? el.offsetWidth : 0;
     const isMobile = w <= 768;
-    const gutter = 25;
+    const gutter = isMobile ? 10 : 25;
     const columnWidth = isMobile ? (w - gutter) / 2 : w * 0.15;
     return {
         itemSelector: '.post',
