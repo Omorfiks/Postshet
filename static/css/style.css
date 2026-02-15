@@ -184,8 +184,9 @@ body {
     perspective: 1000px;
 }
 
-/* Post Card — ширина чуть меньше 20%/50%, чтобы оставался margin 25px между постами; отступ снизу 25px */
+/* Post Card — ширина 15% на ПК, отступ снизу 25px */
 .post {
+    width: 15%;
     margin-bottom: 25px;
     min-width: 0;
     box-sizing: border-box;
