@@ -234,16 +234,19 @@ function playEmojiAnimation(element, emojiData) {
     }, 1000);
 }
 
-// Параметры Masonry: ширина поста 20% на ПК, 50% на телефоне (без горизонтального зазора)
+// Параметры Masonry: 25px отступ по горизонтали и вертикали; ширина поста подстраивается
 function getMasonryOptions(container) {
     const el = container || document.getElementById('posts-container');
     const w = el ? el.offsetWidth : 0;
     const isMobile = w <= 768;
-    const columnWidth = isMobile ? w * 0.5 : w * 0.2;
+    const gutter = 25;
+    const cols = isMobile ? 2 : 5;
+    const totalGutter = gutter * (cols - 1);
+    const columnWidth = (w - totalGutter) / cols;
     return {
         itemSelector: '.post',
         columnWidth: columnWidth,
-        gutter: 0,
+        gutter: gutter,
         percentPosition: true
     };
 }

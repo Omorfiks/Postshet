@@ -184,9 +184,8 @@ body {
     perspective: 1000px;
 }
 
-/* Post Card — ширина 20% на ПК (5 в ряд), высота по контенту */
+/* Post Card — ширина из Masonry (5 кол. ПК / 2 кол. тел.), отступ снизу 25px */
 .post {
-    width: 20%;
     margin-bottom: 25px;
     min-width: 0;
     box-sizing: border-box;
@@ -585,7 +584,6 @@ body {
         padding-right: 8px;
     }
     .post {
-        width: 50%;
         min-width: 0;
         margin-bottom: 10px;
     }
