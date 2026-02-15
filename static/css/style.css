@@ -173,7 +173,7 @@ body {
 
 /* Main Content */
 .main-content {
-    max-width: 1200px;
+    max-width: 100%;
     margin: 30px auto;
     padding: 0 20px;
 }
